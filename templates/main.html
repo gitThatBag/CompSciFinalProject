@@ -17,11 +17,7 @@
       background-color: #f0f0f0;
     }
 
-    @media (max-width: 786px) {
-            .container {
-                flex-direction: column;
-            }
-        }
+
 
     .container {
       height: 100vh;
@@ -31,6 +27,12 @@
       transition: opacity 0.8s ease, transform 0.6s ease;
       overflow: hidden;
     }
+
+      @media (max-width: 786px) {
+          .container {
+              flex-direction: column;
+          }
+      }
 
     .choice {
         flex: 1;
