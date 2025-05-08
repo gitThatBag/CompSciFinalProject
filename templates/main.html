@@ -1,3 +1,4 @@
+<!--
 <!DOCTYPE html>
 <html lang="en">
 
@@ -150,4 +151,176 @@
     </script>
 </body>
 
+</html>
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Two-Choice Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+    --stripe-color: rgba(0, 0, 139, 0.25); /* Your desired stripe color */
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f0f0f0;
+    }
+
+    .container {
+      height: 100vh;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+      transition: opacity 0.8s ease, transform 0.6s ease;
+      overflow: hidden;
+    }
+
+    .choice {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Montserrat', sans-serif;
+        font-size: clamp(1.5rem, 6vw, 3rem); /* Updated line */
+        font-weight: bold;
+        color: white;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        position: relative;
+        z-index: 1;
+    }
+    .choice1 {
+        background-color: #3498db; /* You can keep a base background color */
+        background-image: linear-gradient(45deg, var(--stripe-color) 25%, transparent 25%, transparent 50%, var(--stripe-color) 50%, var(--stripe-color) 75%, transparent 75%, transparent 100%);
+        background-size: 40px 40px;
+        background-repeat: repeat;
+    }
+
+    @media (max-aspect-ratio: 1/1) {
+        .choice1 {
+            background-image: linear-gradient(45deg, var(--stripe-color) 25%, transparent 25%, transparent 50%, var(--stripe-color) 50%, var(--stripe-color) 75%, transparent 75%, transparent 100%);
+            background-size: 30px 30px;
+            background-repeat: repeat;
+        }
+    }
+    .choice2 {
+        background-color: #e74c3c;
+        background-image: radial-gradient(#ca3b2c44 30%, transparent 31%);
+        background-size: 1.5rem 1.5rem; /* Adjust for dot density */
+        background-repeat: repeat;
+        background-blend-mode: multiply;
+    }
+
+    .clicked {
+      animation: snapSpin 0.4s ease forwards;
+      z-index: 10;
+    }
+
+    @keyframes snapSpin {
+      0%   { transform: scale(1) rotateZ(0deg); }
+      45%  { transform: scale(1.05) rotateZ(-4deg); }
+      100% { transform: scale(0.9) rotateZ(6deg); }
+    }
+
+    .fade-out {
+      opacity: 0;
+      transform: scale(0.95) rotateX(8deg);
+    }
+
+    @media (max-aspect-ratio: 1/1) {
+        .choice1 {
+            background-image: linear-gradient(45deg, rgba(0, 0, 139, 0.6) 15%, transparent 15%, transparent 85%, rgba(0, 0, 139, 0.6) 85%);
+            background-size: 50px 50px; /* Adjust for stripe thickness and spacing on smaller screens */
+            background-repeat: repeat;
+        }
+    }
+
+    .choice::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0); /* Transparent initially */
+        transition: background 0.3s ease;
+        z-index: 2;
+        }
+
+    .choice:hover::after {
+        background: rgba(0, 0, 0, 0.145); /* Dims on hover */
+    }
+
+    .or-divider {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: clamp(2.25rem, 5vw, 4.5rem);
+        font-weight: bold;
+        color: #ffffff;
+        z-index: 5;
+        pointer-events: none;
+        user-select: none;
+        text-shadow: 0.5rem 0.5rem black;
+        }
+
+  </style>
+</head>
+<body>
+  <div class="container" id="question-container">
+    <div class="choice choice1" onclick="makeChoice(this, '{{option_a}}')">{{option_a}}</div>
+    <div class="or-divider">OR</div>
+    <div class="choice choice2" onclick="makeChoice(this, '{{option_b}}')">{{option_b}}</div>
+  </div>
+
+  <script>
+    let currentQuestion = 1;
+
+    function makeChoice(element, choice) {
+      const container = document.getElementById('question-container');
+      const choices = container.querySelectorAll('.choice');
+
+      element.classList.add('clicked');
+      choices.forEach(btn => btn.style.pointerEvents = 'none');
+
+      setTimeout(() => {
+        container.classList.add('fade-out');
+      }, 300);
+
+      setTimeout(() => {
+        updateQuestion();
+      }, 1000);
+    }
+
+    function updateQuestion() {
+      fetch(`/next?index=${currentQuestion}`)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById('question-container');
+          if (!data.a || !data.b) {
+            container.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
+                🎉 Thanks for playing!
+              </div>`;
+            return;
+          }
+
+          container.innerHTML = `
+            <div class="choice choice1" onclick="makeChoice(this, '${data.a}')">${data.a}</div>
+            <div class="or-divider">OR</div>
+            <div class="choice choice2" onclick="makeChoice(this, '${data.b}')">${data.b}</div>
+          `;
+
+          container.classList.remove("fade-out");
+          currentQuestion++;
+        });
+    }
+  </script>
+</body>
 </html>
