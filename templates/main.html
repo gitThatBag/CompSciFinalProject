@@ -196,27 +196,6 @@
         position: relative;
         z-index: 1;
     }
-    .choice1 {
-        background-color: #3498db; /* You can keep a base background color */
-        background-image: linear-gradient(45deg, var(--stripe-color) 25%, transparent 25%, transparent 50%, var(--stripe-color) 50%, var(--stripe-color) 75%, transparent 75%, transparent 100%);
-        background-size: 40px 40px;
-        background-repeat: repeat;
-    }
-
-    @media (max-aspect-ratio: 1/1) {
-        .choice1 {
-            background-image: linear-gradient(45deg, var(--stripe-color) 25%, transparent 25%, transparent 50%, var(--stripe-color) 50%, var(--stripe-color) 75%, transparent 75%, transparent 100%);
-            background-size: 30px 30px;
-            background-repeat: repeat;
-        }
-    }
-    .choice2 {
-        background-color: #e74c3c;
-        background-image: radial-gradient(#ca3b2c44 30%, transparent 31%);
-        background-size: 1.5rem 1.5rem; /* Adjust for dot density */
-        background-repeat: repeat;
-        background-blend-mode: multiply;
-    }
 
     .clicked {
       animation: snapSpin 0.4s ease forwards;
