@@ -4,6 +4,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client, Client
+from pydantic import BaseModel
+
 
 app = FastAPI()
 
@@ -43,9 +45,14 @@ async def get_next_question(index: int = 1):
     return {"a": "", "b": ""}
 
 
+class ChoiceModel(BaseModel):
+    choice: str
+
 @app.post("/update-result")
-async def update_result(choice: dict):
-    user_choice = choice.get("choice")
+async def update_result(choice: ChoiceModel):
+    print("Received choice:", choice.choice)
+
+    user_choice = choice.choice
 
     # Get all questions
     response = supabase.table("questions").select("*").execute()
