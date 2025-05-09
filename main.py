@@ -47,15 +47,23 @@ async def get_next_question(index: int = 1):
 async def update_result(choice: dict):
     user_choice = choice.get("choice")
 
-    # Assuming you want to update the result for column_a_result based on the choice
-    if user_choice == "option_a":
-        # Increment column_a_result for the first question
-        response = supabase.table("questions").update({"option_a_results": supabase.raw('option_a_results + 1')}).eq("option_a", user_choice).execute()
-    elif user_choice == "option_b":
-        # Increment column_b_result or some other column for the second option
-        response = supabase.table("questions").update({"option_b_results": supabase.raw('option_b_results + 1')}).eq("option_b", user_choice).execute()
+    # Get all questions
+    response = supabase.table("questions").select("*").execute()
+    questions = response.data
 
-    # Return a success or failure response
-    if response.status_code == 200:
-        return JSONResponse(content={"message": "Result updated successfully!"}, status_code=200)
-    return JSONResponse(content={"message": "Failed to update result."}, status_code=500)
+    for question in questions:
+        if user_choice == question["option_a"]:
+            current_value = question.get("option_a_results", 0)
+            supabase.table("questions").update(
+                {"option_a_results": current_value + 1}
+            ).eq("id", question["id"]).execute()
+            return JSONResponse(content={"message": "Updated option_a_results"}, status_code=200)
+
+        elif user_choice == question["option_b"]:
+            current_value = question.get("option_b_results", 0)
+            supabase.table("questions").update(
+                {"option_b_results": current_value + 1}
+            ).eq("id", question["id"]).execute()
+            return JSONResponse(content={"message": "Updated option_b_results"}, status_code=200)
+
+    return JSONResponse(content={"message": "Choice not found."}, status_code=404)
