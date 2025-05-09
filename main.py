@@ -41,3 +41,21 @@ async def get_next_question(index: int = 1):
         q = questions[index]
         return {"a": q["option_a"], "b": q["option_b"]}
     return {"a": "", "b": ""}
+
+
+@app.post("/update-result")
+async def update_result(choice: dict):
+    user_choice = choice.get("choice")
+
+    # Assuming you want to update the result for column_a_result based on the choice
+    if user_choice == "option_a":
+        # Increment column_a_result for the first question
+        response = supabase.table("questions").update({"column_a_result": supabase.raw('column_a_result + 1')}).eq("option_a", user_choice).execute()
+    elif user_choice == "option_b":
+        # Increment column_b_result or some other column for the second option
+        response = supabase.table("questions").update({"column_b_result": supabase.raw('column_b_result + 1')}).eq("option_b", user_choice).execute()
+
+    # Return a success or failure response
+    if response.status_code == 200:
+        return JSONResponse(content={"message": "Result updated successfully!"}, status_code=200)
+    return JSONResponse(content={"message": "Failed to update result."}, status_code=500)

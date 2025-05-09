@@ -158,8 +158,20 @@
       }, 300);
 
       setTimeout(() => {
+        // Send the choice to the backend
+        updateResult(choice);
         updateQuestion();
       }, 1000);
+    }
+
+    function updateResult(choice) {
+      fetch(`/update-result?choice=${choice}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ choice: choice })
+      });
     }
 
     function updateQuestion() {
