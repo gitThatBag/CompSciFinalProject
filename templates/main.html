@@ -1,17 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Two-Choice Game</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Lora:ital,wght@0,400;1,400&display=swap"
+    rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    :root {
-    --stripe-color: rgba(0, 0, 139, 0.25); /* Your desired stripe color */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
 
-    html, body {
+    :root {
+      --stripe-color: rgba(0, 0, 139, 0.25);
+      /* Your desired stripe color */
+    }
+
+    html,
+    body {
       height: 100%;
       font-family: 'Segoe UI', sans-serif;
       background-color: #f0f0f0;
@@ -28,32 +38,44 @@
       overflow: hidden;
     }
 
-      @media (orientation: portrait) {
-          .container {
-              flex-direction: column;
-          }
+    @media (max-width: 600px) {
+      .choice {
+        font-size: clamp(3rem, 10vw, 5rem);
+        padding: 2rem;
       }
 
-    .choice {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Montserrat', sans-serif;
-        font-size: clamp(4rem, 6vw, 6rem); /* Updated line */
-        font-weight: bold;
-        color: white;
-        cursor: pointer;
-        transition: background-color 0.3s;
-        position: relative;
-        z-index: 1;
+      .or-divider {
+        font-size: clamp(3.5rem, 12vw, 6rem);
+      }
+
+      .container {
+        flex-direction: column;
+      }
     }
+
+    .choice {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', sans-serif;
+      font-size: clamp(4rem, 6vw, 6rem);
+      /* Updated line */
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      position: relative;
+      z-index: 1;
+    }
+
     .choice1 {
-        background-color: #3498db; /* You can keep a base background color */
+      background-color: #3498db;
+      /* You can keep a base background color */
     }
 
     .choice2 {
-        background-color: #e74c3c;
+      background-color: #e74c3c;
     }
 
     .clicked {
@@ -62,9 +84,17 @@
     }
 
     @keyframes snapSpin {
-      0%   { transform: scale(1) rotateZ(0deg); }
-      45%  { transform: scale(1.05) rotateZ(-4deg); }
-      100% { transform: scale(0.9) rotateZ(6deg); }
+      0% {
+        transform: scale(1) rotateZ(0deg);
+      }
+
+      45% {
+        transform: scale(1.05) rotateZ(-4deg);
+      }
+
+      100% {
+        transform: scale(0.9) rotateZ(6deg);
+      }
     }
 
     .fade-out {
@@ -73,35 +103,39 @@
     }
 
     .choice::after {
-        content: '';
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0); /* Transparent initially */
-        transition: background 0.3s ease;
-        z-index: 2;
-        }
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0);
+      /* Transparent initially */
+      transition: background 0.3s ease;
+      z-index: 2;
+    }
 
     .choice:hover::after {
-        background: rgba(0, 0, 0, 0.145); /* Dims on hover */
+      background: rgba(0, 0, 0, 0.145);
+      /* Dims on hover */
     }
 
     .or-divider {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: clamp(4rem, 5vw, 6rem);
-        font-weight: bold;
-        color: #ffffff;
-        z-index: 5;
-        pointer-events: none;
-        user-select: none;
-        text-shadow: 0.5rem 0.5rem black;
-        }
-
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(4rem, 5vw, 6rem);
+      font-weight: bold;
+      color: #ffffff;
+      z-index: 5;
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0.5rem 0.5rem black;
+    }
   </style>
 </head>
+
 <body>
   <div class="container" id="question-container">
     <div class="choice choice1" onclick="makeChoice(this, '{{option_a}}')">{{option_a}}</div>
@@ -153,4 +187,5 @@
     }
   </script>
 </body>
+
 </html>
