@@ -43,7 +43,6 @@ async def get_next_question(index: int = 1):
     return {"a": "", "b": ""}
 
 
-"""
 @app.post("/update-result")
 async def update_result(choice: dict):
     user_choice = choice.get("choice")
@@ -68,4 +67,3 @@ async def update_result(choice: dict):
             return JSONResponse(content={"message": "Updated option_b_results"}, status_code=200)
 
     return JSONResponse(content={"message": "Choice not found."}, status_code=404)
-"""
