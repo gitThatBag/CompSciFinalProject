@@ -175,11 +175,13 @@
     }
 
     function updateQuestion() {
+      currentQuestion++;
+
       fetch(`/next?index=${currentQuestion}`)
         .then(res => res.json())
         .then(data => {
           const container = document.getElementById('question-container');
-          if (!data.a || !data.b) {
+          if (index >= questions.length) {
             container.innerHTML = `
               <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
                 🎉 Thanks for playing!<br><br>
@@ -195,7 +197,7 @@
           `;
 
           container.classList.remove("fade-out");
-          currentQuestion++;
+          
         });
     }
   </script>
