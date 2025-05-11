@@ -181,8 +181,9 @@
           const container = document.getElementById('question-container');
           if (!data.a || !data.b) {
             container.innerHTML = `
-              <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
-                🎉 Thanks for playing!
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
+                🎉 Thanks for playing!<br><br>
+                <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
               </div>`;
             return;
           }
