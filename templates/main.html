@@ -27,8 +27,6 @@
       background-color: #f0f0f0;
     }
 
-
-
     .container {
       min-height: 100dvh;
       display: flex;
@@ -144,7 +142,8 @@
   </div>
 
   <script>
-    let currentQuestion = 1;
+    // Store the current question ID - this will be injected by the server
+    const currentQuestionId = {question_id};
 
     function makeChoice(element, choice) {
       const container = document.getElementById('question-container');
@@ -160,43 +159,30 @@
       setTimeout(() => {
         // Send the choice to the backend
         updateResult(choice);
-        updateQuestion();
       }, 1000);
     }
 
     function updateResult(choice) {
-      fetch(`/update-result`, {
+      fetch(`/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ choice: choice })
+        body: JSON.stringify({ 
+          choice: choice,
+          question_id: currentQuestionId
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.completed) {
+          // No more questions, show results
+          window.location.href = '/results';
+        } else if (data.next_id) {
+          // Redirect to the next question
+          window.location.href = `/question/${data.next_id}`;
+        }
       });
-    }
-
-    function updateQuestion() {
-      fetch('/next')
-        .then(res => res.json())
-        .then(data => {
-          const container = document.getElementById('question-container');
-
-          if (!data.a && !data.b) {
-            container.innerHTML = `
-              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
-                🎉 Thanks for playing!<br><br>
-                <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
-              </div>`;
-            return;
-          }
-
-          container.innerHTML = `
-            <div class="choice choice1" onclick="makeChoice(this, '${data.a}')">${data.a}</div>
-            <div class="or-divider">OR</div>
-            <div class="choice choice2" onclick="makeChoice(this, '${data.b}')">${data.b}</div>
-          `;
-
-          container.classList.remove("fade-out");
-        });
     }
   </script>
 </body>

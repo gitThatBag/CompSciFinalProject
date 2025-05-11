@@ -26,47 +26,37 @@ async def get_game():
     
     current_question = response.data[0]
 
-    # Render the HTML
-    with open("templates/main.html", "r") as file:
+    # Read your HTML template
+    with open("templates/game_template.html", "r") as file:
         template = file.read()
 
+    # Replace the placeholders
     question_html = template.replace("{{option_a}}", current_question["option_a"])
     question_html = question_html.replace("{{option_b}}", current_question["option_b"])
     question_html = question_html.replace("{{question_id}}", str(current_question["id"]))
 
     return HTMLResponse(content=question_html)
 
-@app.get("/question/{question_id}", response_class=JSONResponse)
-async def get_question(question_id: int):
+@app.get("/question/{question_id}", response_class=HTMLResponse)
+async def get_question_page(question_id: int):
     # Fetch the requested question
     response = supabase.table("questions").select("*").eq("id", question_id).execute()
     
     if not response.data:
-        return JSONResponse(content={"error": "Question not found"}, status_code=404)
+        return HTMLResponse(content="Question not found.", status_code=404)
     
     current_question = response.data[0]
     
-    return {
-        "id": current_question["id"],
-        "option_a": current_question["option_a"],
-        "option_b": current_question["option_b"]
-    }
+    # Read your HTML template
+    with open("templates/game_template.html", "r") as file:
+        template = file.read()
 
-@app.get("/next/{current_id}", response_class=JSONResponse)
-async def get_next_question(current_id: int):
-    # Get the next question by ID
-    response = supabase.table("questions").select("*").gt("id", current_id).order("id").limit(1).execute()
-    
-    if not response.data:
-        return {"completed": True, "message": "No more questions"}
-    
-    next_question = response.data[0]
-    
-    return {
-        "id": next_question["id"],
-        "option_a": next_question["option_a"],
-        "option_b": next_question["option_b"]
-    }
+    # Replace the placeholders
+    question_html = template.replace("{{option_a}}", current_question["option_a"])
+    question_html = question_html.replace("{{option_b}}", current_question["option_b"])
+    question_html = question_html.replace("{{question_id}}", str(current_question["id"]))
+
+    return HTMLResponse(content=question_html)
 
 @app.post("/submit")
 async def submit_answer(choice: ChoiceModel):
@@ -110,7 +100,7 @@ async def get_results():
     <head>
         <title>Results</title>
         <style>
-            body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 2rem; }
+            body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 2rem; }
             h1 { color: #333; text-align: center; }
             .question {
                 background: white;
