@@ -17,8 +17,8 @@ class ChoiceModel(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def get_game():
-    # Fetch the first question from Supabase
-    response = supabase.table("questions").select("*").execute()
+    # Fetch the first question from Supabase ordered by ID
+    response = supabase.table("questions").select("*").order("id").execute()
     questions = response.data
     
     if not questions:
@@ -43,8 +43,8 @@ async def get_next_question(request: Request):
     current_index = int(request.query_params.get("index", 0))
     next_index = current_index + 1
     
-    # Fetch all questions
-    response = supabase.table("questions").select("*").execute()
+    # Fetch all questions ordered by ID
+    response = supabase.table("questions").select("*").order("id").execute()
     questions = response.data
     
     if next_index < len(questions):
@@ -55,32 +55,36 @@ async def get_next_question(request: Request):
         return {"a": "", "b": "", "index": next_index}
 
 @app.post("/update-result")
-async def update_result(choice: ChoiceModel):
+async def update_result(choice: ChoiceModel, request: Request):
     user_choice = choice.choice
     
-    # Find the question that matches the user's choice
-    response = supabase.table("questions").select("*").execute()
+    # Get the current index from the query params
+    current_index = int(request.query_params.get("index", 0))
+    
+    # Get the ordered questions
+    response = supabase.table("questions").select("*").order("id").execute()
     questions = response.data
     
-    for question in questions:
+    # Only update if we have a valid index
+    if current_index < len(questions):
+        question = questions[current_index]
+        
         if user_choice == question["option_a"]:
             current_value = question.get("option_a_results", 0) or 0
             supabase.table("questions").update(
                 {"option_a_results": current_value + 1}
             ).eq("id", question["id"]).execute()
-            break
         elif user_choice == question["option_b"]:
             current_value = question.get("option_b_results", 0) or 0
             supabase.table("questions").update(
                 {"option_b_results": current_value + 1}
             ).eq("id", question["id"]).execute()
-            break
     
     return JSONResponse(content={"message": "Updated results"}, status_code=200)
 
 @app.get("/results", response_class=HTMLResponse)
 async def get_results():
-    response = supabase.table("questions").select("*").execute()
+    response = supabase.table("questions").select("*").order("id").execute()
     questions = response.data
     
     html = """

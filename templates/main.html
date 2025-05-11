@@ -165,7 +165,7 @@
     }
 
     function updateResult(choice) {
-      fetch(`/update-result`, {
+      fetch(`/update-result?index=${currentIndex}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
