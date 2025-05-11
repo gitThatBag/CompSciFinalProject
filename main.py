@@ -4,7 +4,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client, Client
 from pydantic import BaseModel
-from uuid import uuid4
 
 app = FastAPI()
 
@@ -13,75 +12,17 @@ url = "https://ebkgvudslketmjxvbdpq.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVia2d2dWRzbGtldG1qeHZiZHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2MjMwNzgsImV4cCI6MjA2MjE5OTA3OH0.Y1MdCLVK0hUCDo1QH8unSPHjji7Y595_irOckdSPgmk"
 supabase: Client = create_client(url, key)
 
-# Global question order (loaded once at startup)
-question_order = []
-
 class ChoiceModel(BaseModel):
     choice: str
-
-@app.on_event("startup")
-async def load_questions():
-    global question_order
-    response = supabase.table("questions").select("id").order("id").execute()
-    question_order = [q["id"] for q in response.data]
-
-@app.middleware("http")
-async def add_session(request: Request, call_next):
-    session_id = request.cookies.get("session_id")
-    if not session_id:
-        # Create new session ID
-        session_id = str(uuid4())
-        
-        # Create user record in Supabase
-        supabase.table("user_sessions").insert({
-            "session_id": session_id,
-            "answered_questions": []
-        }).execute()
-        
-        request.state.session_id = session_id
-        response = await call_next(request)
-        response.set_cookie("session_id", session_id)
-        return response
-    
-    # Session exists, fetch from database
-    request.state.session_id = session_id
-    return await call_next(request)
-
-# Helper function to get answered questions for a session
-async def get_answered_questions(session_id: str):
-    response = supabase.table("user_sessions").select("answered_questions").eq("session_id", session_id).execute()
-    
-    if not response.data:
-        # Create a new record if it doesn't exist (session persistence after server restart)
-        supabase.table("user_sessions").insert({
-            "session_id": session_id,
-            "answered_questions": []
-        }).execute()
-        return []
-    
-    return response.data[0].get("answered_questions", [])
+    question_id: int
 
 @app.get("/", response_class=HTMLResponse)
-async def get_game(request: Request):
-    session_id = request.state.session_id
+async def get_game():
+    # Simply get the first question
+    response = supabase.table("questions").select("*").order("id").limit(1).execute()
     
-    # Get answered questions from database
-    answered = await get_answered_questions(session_id)
-
-    # Find the first unanswered question
-    current_question_id = None
-    for q_id in question_order:
-        if q_id not in answered:
-            current_question_id = q_id
-            break
-
-    if not current_question_id:
-        return HTMLResponse(content="You've completed all questions! <a href='/results'>View results</a>")
-
-    # Fetch the question
-    response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
     if not response.data:
-        return HTMLResponse(content="Question not found.", status_code=404)
+        return HTMLResponse(content="No questions available.")
     
     current_question = response.data[0]
 
@@ -91,90 +32,73 @@ async def get_game(request: Request):
 
     question_html = template.replace("{{option_a}}", current_question["option_a"])
     question_html = question_html.replace("{{option_b}}", current_question["option_b"])
+    question_html = question_html.replace("{{question_id}}", str(current_question["id"]))
 
     return HTMLResponse(content=question_html)
 
-@app.get("/next", response_class=JSONResponse)
-async def get_next_question(request: Request):
-    session_id = request.state.session_id
+@app.get("/question/{question_id}", response_class=JSONResponse)
+async def get_question(question_id: int):
+    # Fetch the requested question
+    response = supabase.table("questions").select("*").eq("id", question_id).execute()
     
-    # Get answered questions from database
-    answered = await get_answered_questions(session_id)
-
-    # Find the first unanswered question
-    current_question_id = None
-    for q_id in question_order:
-        if q_id not in answered:
-            current_question_id = q_id
-            break
-
-    if not current_question_id:
-        return {"completed": True, "message": "All questions completed"}
-
-    # Fetch the question
-    response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
     if not response.data:
         return JSONResponse(content={"error": "Question not found"}, status_code=404)
     
     current_question = response.data[0]
     
     return {
-        "a": current_question["option_a"],
-        "b": current_question["option_b"],
-        "question_id": current_question_id,
-        "progress": f"{len(answered) + 1}/{len(question_order)}"
+        "id": current_question["id"],
+        "option_a": current_question["option_a"],
+        "option_b": current_question["option_b"]
     }
 
-@app.post("/update-result")
-async def update_result(choice: ChoiceModel, request: Request):
-    session_id = request.state.session_id
-    user_choice = choice.choice
+@app.get("/next/{current_id}", response_class=JSONResponse)
+async def get_next_question(current_id: int):
+    # Get the next question by ID
+    response = supabase.table("questions").select("*").gt("id", current_id).order("id").limit(1).execute()
     
-    # Get answered questions from database
-    answered = await get_answered_questions(session_id)
+    if not response.data:
+        return {"completed": True, "message": "No more questions"}
+    
+    next_question = response.data[0]
+    
+    return {
+        "id": next_question["id"],
+        "option_a": next_question["option_a"],
+        "option_b": next_question["option_b"]
+    }
 
-    # Find the first unanswered question
-    current_question_id = None
-    for q_id in question_order:
-        if q_id not in answered:
-            current_question_id = q_id
-            break
-
-    if not current_question_id:
-        return JSONResponse(content={"error": "All questions completed"}, status_code=400)
-
-    # Fetch the question to validate choices
-    response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
+@app.post("/submit")
+async def submit_answer(choice: ChoiceModel):
+    # Get the question to update
+    response = supabase.table("questions").select("*").eq("id", choice.question_id).execute()
+    
     if not response.data:
         return JSONResponse(content={"error": "Question not found"}, status_code=404)
     
     question = response.data[0]
     
     # Update the count
-    if user_choice == question["option_a"]:
-        current_value = question.get("option_a_results", 0)
+    if choice.choice == question["option_a"]:
+        current_value = question.get("option_a_results", 0) or 0
         supabase.table("questions").update(
             {"option_a_results": current_value + 1}
         ).eq("id", question["id"]).execute()
-    elif user_choice == question["option_b"]:
-        current_value = question.get("option_b_results", 0)
+    elif choice.choice == question["option_b"]:
+        current_value = question.get("option_b_results", 0) or 0
         supabase.table("questions").update(
             {"option_b_results": current_value + 1}
         ).eq("id", question["id"]).execute()
     else:
         return JSONResponse(content={"error": "Invalid choice"}, status_code=400)
     
-    # Mark question as answered in the database
-    if current_question_id not in answered:
-        answered.append(current_question_id)
-        supabase.table("user_sessions").update(
-            {"answered_questions": answered}
-        ).eq("session_id", session_id).execute()
+    # Get the next question ID
+    next_response = supabase.table("questions").select("id").gt("id", choice.question_id).order("id").limit(1).execute()
     
-    return JSONResponse(content={
-        "message": "Updated results",
-        "progress": f"{len(answered)}/{len(question_order)}"
-    }, status_code=200)
+    if not next_response.data:
+        return JSONResponse(content={"next_id": None, "completed": True}, status_code=200)
+    
+    return JSONResponse(content={"next_id": next_response.data[0]["id"]}, status_code=200)
 
 @app.get("/results", response_class=HTMLResponse)
 async def get_results():
