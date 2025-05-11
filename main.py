@@ -1,3 +1,18 @@
+"""
+Backend for a This-or-That style game. Uses Supabase to hold all of the data.
+Simply sorts the database by the 'id' and returns the respective question.
+
+Made with ❤️ by Sam Steeves and Oliver Deighton for Mr. Burhanna Comp-Sci
+final project.
+
+Please give us an A+
+
+"""
+
+
+
+
+
 import os
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -8,13 +23,17 @@ from pydantic import BaseModel
 app = FastAPI()
 
 # Set up Supabase
-url = "https://ebkgvudslketmjxvbdpq.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVia2d2dWRzbGtldG1qeHZiZHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2MjMwNzgsImV4cCI6MjA2MjE5OTA3OH0.Y1MdCLVK0hUCDo1QH8unSPHjji7Y595_irOckdSPgmk"
+# Uses Railway Environmental variables to keep things safe and secure (Oh good, don't want people stealing this very important data)
+url = os.environ.get("url")
+key = os.environ.get("key")
+
 supabase: Client = create_client(url, key)
 
 class ChoiceModel(BaseModel):
     choice: str
 
+
+# Default app routing
 @app.get("/", response_class=HTMLResponse)
 async def get_game():
     # Fetch the first question from Supabase ordered by ID
@@ -37,6 +56,7 @@ async def get_game():
     
     return HTMLResponse(content=question_html)
 
+# Used to fetch the next question (Duh)
 @app.get("/next", response_class=JSONResponse)
 async def get_next_question(request: Request):
     # Get the current index from the query param (default to 0)
@@ -54,6 +74,7 @@ async def get_next_question(request: Request):
     else:
         return {"a": "", "b": "", "index": next_index}
 
+# Keeps track of how many users have chosen one option over the other and saves it in Supabase
 @app.post("/update-result")
 async def update_result(choice: ChoiceModel, request: Request):
     user_choice = choice.choice
@@ -82,6 +103,7 @@ async def update_result(choice: ChoiceModel, request: Request):
     
     return JSONResponse(content={"message": "Updated results"}, status_code=200)
 
+# Results! (ngl I kinda got lazy and didnt really make this look too good)
 @app.get("/results", response_class=HTMLResponse)
 async def get_results():
     response = supabase.table("questions").select("*").order("id").execute()
