@@ -113,7 +113,7 @@ async def update_result(choice: ChoiceModel, request: Request):
     if session_id not in answered_questions:
         return JSONResponse(content={"error": "Invalid session"}, status_code=400)
 
-    # Find the current question (first unanswered one)
+    # Find the first unanswered question
     current_question_id = None
     for q_id in question_order:
         if q_id not in answered_questions[session_id]:
@@ -144,7 +144,7 @@ async def update_result(choice: ChoiceModel, request: Request):
     else:
         return JSONResponse(content={"error": "Invalid choice"}, status_code=400)
     
-    # Mark question as answered - THIS IS THE CRITICAL FIX
+    # Mark question as answered
     if current_question_id not in answered_questions[session_id]:
         answered_questions[session_id].append(current_question_id)
     
