@@ -1,7 +1,7 @@
 <!-- 
 Main html file for This-or-That style web-game.
 Was a fun project, learned alot, and got a few headaches.
-go to 'totallyawesomeapp.com/surprise' for a fun surprise....
+Would do again
 -->
 
 
@@ -22,18 +22,12 @@ go to 'totallyawesomeapp.com/surprise' for a fun surprise....
       box-sizing: border-box;
     }
 
-    :root {
-      --stripe-color: rgba(0, 0, 139, 0.25);
-      /* Your desired stripe color */
-    }
-
     html,
     body {
       height: 100%;
       font-family: 'Segoe UI', sans-serif;
       background-color: #f0f0f0;
     }
-
 
 
     .container {
@@ -45,6 +39,7 @@ go to 'totallyawesomeapp.com/surprise' for a fun surprise....
       overflow: hidden;
     }
 
+    /* Used to shrink font sizes and change the orientaion depending on screen size :) */
     @media (max-width: 600px) {
       .choice {
         font-size: clamp(3rem, 10vw, 5rem);
@@ -67,7 +62,6 @@ go to 'totallyawesomeapp.com/surprise' for a fun surprise....
       justify-content: center;
       font-family: 'Montserrat', sans-serif;
       font-size: clamp(4rem, 6vw, 6rem);
-      /* Updated line */
       font-weight: bold;
       color: white;
       cursor: pointer;
@@ -78,7 +72,6 @@ go to 'totallyawesomeapp.com/surprise' for a fun surprise....
 
     .choice1 {
       background-color: #3498db;
-      /* You can keep a base background color */
     }
 
     .choice2 {
@@ -117,14 +110,12 @@ go to 'totallyawesomeapp.com/surprise' for a fun surprise....
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0);
-      /* Transparent initially */
       transition: background 0.3s ease;
       z-index: 2;
     }
 
     .choice:hover::after {
       background: rgba(0, 0, 0, 0.145);
-      /* Dims on hover */
     }
 
     .or-divider {
@@ -165,7 +156,6 @@ go to 'totallyawesomeapp.com/surprise' for a fun surprise....
       }, 300);
 
       setTimeout(() => {
-        // Send the choice to the backend
         updateResult(choice);
         updateQuestion();
       }, 1000);
