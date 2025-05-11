@@ -4,6 +4,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client, Client
 from pydantic import BaseModel
+from uuid import uuid4
+
 
 app = FastAPI()
 
@@ -12,87 +14,101 @@ url = "https://ebkgvudslketmjxvbdpq.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVia2d2dWRzbGtldG1qeHZiZHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2MjMwNzgsImV4cCI6MjA2MjE5OTA3OH0.Y1MdCLVK0hUCDo1QH8unSPHjji7Y595_irOckdSPgmk"
 supabase: Client = create_client(url, key)
 
+# Serve static files if needed
+#app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Temporary in-memory session storage (you may use a database for persistent storage)
+user_sessions = {}
+
 class ChoiceModel(BaseModel):
     choice: str
-    question_id: int
+
+@app.middleware("http")
+async def add_session(request: Request, call_next):
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        session_id = str(uuid4())  # Generate a new session if not found
+        request.state.session_id = session_id
+        response = await call_next(request)
+        response.set_cookie("session_id", session_id)
+        return response
+    request.state.session_id = session_id
+    return await call_next(request)
 
 @app.get("/", response_class=HTMLResponse)
-async def get_game():
-    # Simply get the first question
-    response = supabase.table("questions").select("*").order("id").limit(1).execute()
-    
-    if not response.data:
-        return HTMLResponse(content="No questions available.")
-    
-    current_question = response.data[0]
+async def get_game(request: Request):
+    # Get the user's session ID
+    session_id = request.state.session_id
 
-    # Read your HTML template
-    with open("templates/game_template.html", "r") as file:
+    # Retrieve the current question index from the session (default to 0 if not found)
+    current_index = user_sessions.get(session_id, 0)
+
+    # Fetch the question list from Supabase
+    response = supabase.table("questions").select("*").execute()
+    questions = response.data
+
+    if current_index >= len(questions):
+        return HTMLResponse(content="No more questions.", status_code=404)
+
+    # Get the current question
+    current_question = questions[current_index]
+
+    # Render the HTML with the question
+    with open("templates/main.html", "r") as file:
         template = file.read()
 
-    # Replace the placeholders
     question_html = template.replace("{{option_a}}", current_question["option_a"])
     question_html = question_html.replace("{{option_b}}", current_question["option_b"])
-    question_html = question_html.replace("{{question_id}}", str(current_question["id"]))
 
     return HTMLResponse(content=question_html)
 
-@app.get("/question/{question_id}", response_class=HTMLResponse)
-async def get_question_page(question_id: int):
-    # Fetch the requested question
-    response = supabase.table("questions").select("*").eq("id", question_id).execute()
-    
-    if not response.data:
-        return HTMLResponse(content="Question not found.", status_code=404)
-    
-    current_question = response.data[0]
-    
-    # Read your HTML template
-    with open("templates/game_template.html", "r") as file:
-        template = file.read()
+@app.get("/next", response_class=JSONResponse)
+async def get_next_question(request: Request):
+    session_id = request.state.session_id
+    current_index = user_sessions.get(session_id, 0)
 
-    # Replace the placeholders
-    question_html = template.replace("%%option_a%%", current_question["option_a"])
-    question_html = question_html.replace("%%option_b%%", current_question["option_b"])
-    question_html = question_html.replace("%%question_id%%", str(current_question["id"]))
+    # Fetch all questions
+    response = supabase.table("questions").select("*").execute()
+    questions = response.data
 
-    return HTMLResponse(content=question_html)
-
-@app.post("/submit")
-async def submit_answer(choice: ChoiceModel):
-    # Get the question to update
-    response = supabase.table("questions").select("*").eq("id", choice.question_id).execute()
-    
-    if not response.data:
-        return JSONResponse(content={"error": "Question not found"}, status_code=404)
-    
-    question = response.data[0]
-    
-    # Update the count
-    if choice.choice == question["option_a"]:
-        current_value = question.get("option_a_results", 0) or 0
-        supabase.table("questions").update(
-            {"option_a_results": current_value + 1}
-        ).eq("id", question["id"]).execute()
-    elif choice.choice == question["option_b"]:
-        current_value = question.get("option_b_results", 0) or 0
-        supabase.table("questions").update(
-            {"option_b_results": current_value + 1}
-        ).eq("id", question["id"]).execute()
+    if current_index < len(questions):
+        # Serve the current question
+        current_question = questions[current_index]
+        return {"a": current_question["option_a"], "b": current_question["option_b"]}
     else:
-        return JSONResponse(content={"error": "Invalid choice"}, status_code=400)
-    
-    # Get the next question ID
-    next_response = supabase.table("questions").select("id").gt("id", choice.question_id).order("id").limit(1).execute()
-    
-    if not next_response.data:
-        return JSONResponse(content={"next_id": None, "completed": True}, status_code=200)
-    
-    return JSONResponse(content={"next_id": next_response.data[0]["id"]}, status_code=200)
+        return {"a": "", "b": ""}
+
+@app.post("/update-result")
+async def update_result(choice: ChoiceModel, request: Request):
+    session_id = request.state.session_id
+    user_choice = choice.choice
+
+    # Fetch all questions
+    response = supabase.table("questions").select("*").execute()
+    questions = response.data
+
+    for question in questions:
+        if user_choice == question["option_a"]:
+            current_value = question.get("option_a_results", 0)
+            supabase.table("questions").update(
+                {"option_a_results": current_value + 1}
+            ).eq("id", question["id"]).execute()
+            break
+        elif user_choice == question["option_b"]:
+            current_value = question.get("option_b_results", 0)
+            supabase.table("questions").update(
+                {"option_b_results": current_value + 1}
+            ).eq("id", question["id"]).execute()
+            break
+
+    # Update session to move to the next question
+    user_sessions[session_id] = user_sessions.get(session_id, 0) + 1
+
+    return JSONResponse(content={"message": "Updated results"}, status_code=200)
 
 @app.get("/results", response_class=HTMLResponse)
 async def get_results():
-    response = supabase.table("questions").select("*").order("id").execute()
+    response = supabase.table("questions").select("*").execute()
     questions = response.data
 
     html = """
@@ -100,45 +116,25 @@ async def get_results():
     <head>
         <title>Results</title>
         <style>
-            body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 2rem; }
-            h1 { color: #333; text-align: center; }
+            body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 2rem; }
+            h2 { color: #333; }
             .question {
                 background: white;
                 border-radius: 10px;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                 padding: 1.5rem;
                 margin-bottom: 1.5rem;
-                max-width: 800px;
-                margin-left: auto;
-                margin-right: auto;
             }
-            .bar-container {
-                display: flex;
+            .bar {
                 height: 30px;
-                margin: 1rem 0;
+                margin: 0.5rem 0;
+                display: flex;
                 border-radius: 5px;
                 overflow: hidden;
-                background: #eee;
+                background: #ddd;
             }
-            .a-bar { 
-                background: #3498db; 
-                color: white; 
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                padding-right: 10px;
-                font-weight: bold;
-            }
-            .b-bar { 
-                background: #e74c3c; 
-                color: white; 
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                padding-right: 10px;
-                font-weight: bold;
-            }
-            .total { text-align: center; color: #666; margin-top: 1rem; }
+            .a-bar { background: #3498db; color: white; text-align: right; padding-right: 10px; }
+            .b-bar { background: #e74c3c; color: white; text-align: right; padding-right: 10px; }
         </style>
     </head>
     <body>
@@ -158,15 +154,15 @@ async def get_results():
         html += f"""
         <div class="question">
             <h2>{a} <span style="color:#666;">vs</span> {b}</h2>
-            <div class="bar-container">
+            <div class="bar">
                 <div class="a-bar" style="width: {a_percent}%;">{a_percent}%</div>
             </div>
             <p>{a}: {a_count} votes</p>
-            <div class="bar-container">
+            <div class="bar">
                 <div class="b-bar" style="width: {b_percent}%;">{b_percent}%</div>
             </div>
             <p>{b}: {b_count} votes</p>
-            <p class="total"><strong>Total votes:</strong> {total}</p>
+            <p><strong>Total votes:</strong> {total}</p>
         </div>
         """
 

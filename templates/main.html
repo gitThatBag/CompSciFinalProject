@@ -138,67 +138,66 @@
 
 <body>
   <div class="container" id="question-container">
-    <div class="choice choice1" onclick="makeChoice(this, '%%option_a%%')">%%option_a%%</div>
+    <div class="choice choice1" onclick="makeChoice(this, '{{option_a}}')">{{option_a}}</div>
     <div class="or-divider">OR</div>
-    <div class="choice choice2" onclick="makeChoice(this, '%%option_b%%')">%%option_b%%</div>    
+    <div class="choice choice2" onclick="makeChoice(this, '{{option_b}}')">{{option_b}}</div>
   </div>
 
   <script>
-        let currentQuestion = {{ question_id | tojson }};
-        // inject from backend
-  
-    function makeChoice(element, choice, questionId) {
+    let currentQuestion = 1;
+
+    function makeChoice(element, choice) {
       const container = document.getElementById('question-container');
       const choices = container.querySelectorAll('.choice');
-  
+
       element.classList.add('clicked');
       choices.forEach(btn => btn.style.pointerEvents = 'none');
-  
+
       setTimeout(() => {
         container.classList.add('fade-out');
       }, 300);
-  
+
       setTimeout(() => {
-        // Send the choice and question_id to the backend
-        updateResult(choice, questionId);
+        // Send the choice to the backend
+        updateResult(choice);
+        updateQuestion();
       }, 1000);
     }
-  
-    function updateResult(choice, questionId) {
-      fetch(`/submit`, {
+
+    function updateResult(choice) {
+      fetch(`/update-result`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ choice: choice, question_id: questionId })
-      }).then(res => res.json())
-        .then(data => {
-          if (data.completed || !data.next_id) {
-            showCompletionScreen();
-          } else {
-            loadNextQuestion(data.next_id);
-          }
-        });
+        body: JSON.stringify({ choice: choice })
+      });
     }
-  
-    function loadNextQuestion(nextId) {
-      fetch(`/question/${nextId}`)
-        .then(res => res.text())
-        .then(html => {
-          document.open();
-          document.write(html);
-          document.close();
-        });
-    }
-  
-    function showCompletionScreen() {
-      const container = document.getElementById('question-container');
-      container.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
-          🎉 Thanks for playing!<br><br>
-          <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
-        </div>`;
-    }
+
+    function updateQuestion() {
+    fetch('/next')
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('question-container');
+
+        if (!data.a && !data.b) {
+          container.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
+              🎉 Thanks for playing!<br><br>
+              <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="choice choice1" onclick="makeChoice(this, '${data.a}')">${data.a}</div>
+          <div class="or-divider">OR</div>
+          <div class="choice choice2" onclick="makeChoice(this, '${data.b}')">${data.b}</div>
+        `;
+
+        container.classList.remove("fade-out");
+      });
+  }
   </script>
 </body>
 
