@@ -1,5 +1,4 @@
 import os
-import random
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,58 +13,52 @@ url = "https://ebkgvudslketmjxvbdpq.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVia2d2dWRzbGtldG1qeHZiZHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2MjMwNzgsImV4cCI6MjA2MjE5OTA3OH0.Y1MdCLVK0hUCDo1QH8unSPHjji7Y595_irOckdSPgmk"
 supabase: Client = create_client(url, key)
 
-# Session storage now tracks answered questions and maintains order
-user_sessions = {}  # Format: {session_id: {"question_order": [], "current_index": 0, "answered": []}}
+# Global question order (loaded once at startup)
+question_order = []
+answered_questions = {}  # Format: {session_id: [answered_question_ids]}
 
 class ChoiceModel(BaseModel):
     choice: str
+
+@app.on_event("startup")
+async def load_questions():
+    global question_order
+    response = supabase.table("questions").select("id").order("id").execute()
+    question_order = [q["id"] for q in response.data]
 
 @app.middleware("http")
 async def add_session(request: Request, call_next):
     session_id = request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid4())
-        # Initialize new session with randomized question order
-        response = supabase.table("questions").select("id").execute()
-        question_ids = [q["id"] for q in response.data]
-        random.shuffle(question_ids)
-        user_sessions[session_id] = {
-            "question_order": question_ids,
-            "current_index": 0,
-            "answered": []
-        }
+        answered_questions[session_id] = []
         request.state.session_id = session_id
         response = await call_next(request)
         response.set_cookie("session_id", session_id)
         return response
-    elif session_id not in user_sessions:
-        # Initialize if session exists but not in our storage
-        response = supabase.table("questions").select("id").execute()
-        question_ids = [q["id"] for q in response.data]
-        random.shuffle(question_ids)
-        user_sessions[session_id] = {
-            "question_order": question_ids,
-            "current_index": 0,
-            "answered": []
-        }
+    elif session_id not in answered_questions:
+        answered_questions[session_id] = []
     request.state.session_id = session_id
     return await call_next(request)
 
 @app.get("/", response_class=HTMLResponse)
 async def get_game(request: Request):
     session_id = request.state.session_id
-    session_data = user_sessions.get(session_id)
     
-    if not session_data:
+    if session_id not in answered_questions:
         return HTMLResponse(content="Session expired. Please refresh.", status_code=400)
 
-    # Get the current question ID from the ordered list
-    if session_data["current_index"] >= len(session_data["question_order"]):
-        return HTMLResponse(content="You've completed all questions!", status_code=200)
+    # Find the first unanswered question
+    current_question_id = None
+    for q_id in question_order:
+        if q_id not in answered_questions[session_id]:
+            current_question_id = q_id
+            break
 
-    current_question_id = session_data["question_order"][session_data["current_index"]]
-    
-    # Fetch the specific question from Supabase
+    if not current_question_id:
+        return HTMLResponse(content="You've completed all questions! <a href='/results'>View results</a>")
+
+    # Fetch the question
     response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
     if not response.data:
         return HTMLResponse(content="Question not found.", status_code=404)
@@ -84,17 +77,20 @@ async def get_game(request: Request):
 @app.get("/next", response_class=JSONResponse)
 async def get_next_question(request: Request):
     session_id = request.state.session_id
-    session_data = user_sessions.get(session_id)
     
-    if not session_data:
+    if session_id not in answered_questions:
         return JSONResponse(content={"error": "Invalid session"}, status_code=400)
 
-    # Check if we've completed all questions
-    if session_data["current_index"] >= len(session_data["question_order"]):
+    # Find the first unanswered question
+    current_question_id = None
+    for q_id in question_order:
+        if q_id not in answered_questions[session_id]:
+            current_question_id = q_id
+            break
+
+    if not current_question_id:
         return {"completed": True, "message": "All questions completed"}
 
-    current_question_id = session_data["question_order"][session_data["current_index"]]
-    
     # Fetch the question
     response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
     if not response.data:
@@ -106,7 +102,7 @@ async def get_next_question(request: Request):
         "a": current_question["option_a"],
         "b": current_question["option_b"],
         "question_id": current_question_id,
-        "progress": f"{session_data['current_index'] + 1}/{len(session_data['question_order'])}"
+        "progress": f"{len(answered_questions[session_id]) + 1}/{len(question_order)}"
     }
 
 @app.post("/update-result")
@@ -114,17 +110,19 @@ async def update_result(choice: ChoiceModel, request: Request):
     session_id = request.state.session_id
     user_choice = choice.choice
     
-    if session_id not in user_sessions:
+    if session_id not in answered_questions:
         return JSONResponse(content={"error": "Invalid session"}, status_code=400)
-    
-    session_data = user_sessions[session_id]
-    current_index = session_data["current_index"]
-    
-    if current_index >= len(session_data["question_order"]):
+
+    # Find the first unanswered question
+    current_question_id = None
+    for q_id in question_order:
+        if q_id not in answered_questions[session_id]:
+            current_question_id = q_id
+            break
+
+    if not current_question_id:
         return JSONResponse(content={"error": "All questions completed"}, status_code=400)
-    
-    current_question_id = session_data["question_order"][current_index]
-    
+
     # Fetch the question to validate choices
     response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
     if not response.data:
@@ -146,19 +144,18 @@ async def update_result(choice: ChoiceModel, request: Request):
     else:
         return JSONResponse(content={"error": "Invalid choice"}, status_code=400)
     
-    # Mark question as answered and move to next
-    if current_question_id not in session_data["answered"]:
-        session_data["answered"].append(current_question_id)
-    session_data["current_index"] += 1
+    # Mark question as answered
+    if current_question_id not in answered_questions[session_id]:
+        answered_questions[session_id].append(current_question_id)
     
     return JSONResponse(content={
         "message": "Updated results",
-        "progress": f"{session_data['current_index']}/{len(session_data['question_order'])}"
+        "progress": f"{len(answered_questions[session_id])}/{len(question_order)}"
     }, status_code=200)
 
 @app.get("/results", response_class=HTMLResponse)
 async def get_results():
-    response = supabase.table("questions").select("*").execute()
+    response = supabase.table("questions").select("*").order("id").execute()
     questions = response.data
 
     html = """
