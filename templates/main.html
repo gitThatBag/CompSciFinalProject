@@ -144,7 +144,7 @@
   </div>
 
   <script>
-    let currentQuestion = 1;
+    let currentIndex = 0;
 
     function makeChoice(element, choice) {
       const container = document.getElementById('question-container');
@@ -175,29 +175,32 @@
     }
 
     function updateQuestion() {
-    fetch('/next')
-      .then(res => res.json())
-      .then(data => {
-        const container = document.getElementById('question-container');
+      fetch(`/next?index=${currentIndex}`)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById('question-container');
+          
+          // Update the current index
+          currentIndex = data.index;
 
-        if (!data.a && !data.b) {
+          if (!data.a && !data.b) {
+            container.innerHTML = `
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
+                🎉 Thanks for playing!<br><br>
+                <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
+              </div>`;
+            return;
+          }
+
           container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
-              🎉 Thanks for playing!<br><br>
-              <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
-            </div>`;
-          return;
-        }
+            <div class="choice choice1" onclick="makeChoice(this, '${data.a}')">${data.a}</div>
+            <div class="or-divider">OR</div>
+            <div class="choice choice2" onclick="makeChoice(this, '${data.b}')">${data.b}</div>
+          `;
 
-        container.innerHTML = `
-          <div class="choice choice1" onclick="makeChoice(this, '${data.a}')">${data.a}</div>
-          <div class="or-divider">OR</div>
-          <div class="choice choice2" onclick="makeChoice(this, '${data.b}')">${data.b}</div>
-        `;
-
-        container.classList.remove("fade-out");
-      });
-  }
+          container.classList.remove("fade-out");
+        });
+    }
   </script>
 </body>
 
