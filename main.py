@@ -15,7 +15,6 @@ supabase: Client = create_client(url, key)
 
 # Global question order (loaded once at startup)
 question_order = []
-answered_questions = {}  # Format: {session_id: [answered_question_ids]}
 
 class ChoiceModel(BaseModel):
     choice: str
@@ -30,28 +29,49 @@ async def load_questions():
 async def add_session(request: Request, call_next):
     session_id = request.cookies.get("session_id")
     if not session_id:
+        # Create new session ID
         session_id = str(uuid4())
-        answered_questions[session_id] = []
+        
+        # Create user record in Supabase
+        supabase.table("user_sessions").insert({
+            "session_id": session_id,
+            "answered_questions": []
+        }).execute()
+        
         request.state.session_id = session_id
         response = await call_next(request)
         response.set_cookie("session_id", session_id)
         return response
-    elif session_id not in answered_questions:
-        answered_questions[session_id] = []
+    
+    # Session exists, fetch from database
     request.state.session_id = session_id
     return await call_next(request)
+
+# Helper function to get answered questions for a session
+async def get_answered_questions(session_id: str):
+    response = supabase.table("user_sessions").select("answered_questions").eq("session_id", session_id).execute()
+    
+    if not response.data:
+        # Create a new record if it doesn't exist (session persistence after server restart)
+        supabase.table("user_sessions").insert({
+            "session_id": session_id,
+            "answered_questions": []
+        }).execute()
+        return []
+    
+    return response.data[0].get("answered_questions", [])
 
 @app.get("/", response_class=HTMLResponse)
 async def get_game(request: Request):
     session_id = request.state.session_id
     
-    if session_id not in answered_questions:
-        return HTMLResponse(content="Session expired. Please refresh.", status_code=400)
+    # Get answered questions from database
+    answered = await get_answered_questions(session_id)
 
     # Find the first unanswered question
     current_question_id = None
     for q_id in question_order:
-        if q_id not in answered_questions[session_id]:
+        if q_id not in answered:
             current_question_id = q_id
             break
 
@@ -78,13 +98,13 @@ async def get_game(request: Request):
 async def get_next_question(request: Request):
     session_id = request.state.session_id
     
-    if session_id not in answered_questions:
-        return JSONResponse(content={"error": "Invalid session"}, status_code=400)
+    # Get answered questions from database
+    answered = await get_answered_questions(session_id)
 
     # Find the first unanswered question
     current_question_id = None
     for q_id in question_order:
-        if q_id not in answered_questions[session_id]:
+        if q_id not in answered:
             current_question_id = q_id
             break
 
@@ -102,7 +122,7 @@ async def get_next_question(request: Request):
         "a": current_question["option_a"],
         "b": current_question["option_b"],
         "question_id": current_question_id,
-        "progress": f"{len(answered_questions[session_id]) + 1}/{len(question_order)}"
+        "progress": f"{len(answered) + 1}/{len(question_order)}"
     }
 
 @app.post("/update-result")
@@ -110,13 +130,13 @@ async def update_result(choice: ChoiceModel, request: Request):
     session_id = request.state.session_id
     user_choice = choice.choice
     
-    if session_id not in answered_questions:
-        return JSONResponse(content={"error": "Invalid session"}, status_code=400)
+    # Get answered questions from database
+    answered = await get_answered_questions(session_id)
 
     # Find the first unanswered question
     current_question_id = None
     for q_id in question_order:
-        if q_id not in answered_questions[session_id]:
+        if q_id not in answered:
             current_question_id = q_id
             break
 
@@ -144,13 +164,16 @@ async def update_result(choice: ChoiceModel, request: Request):
     else:
         return JSONResponse(content={"error": "Invalid choice"}, status_code=400)
     
-    # Mark question as answered
-    if current_question_id not in answered_questions[session_id]:
-        answered_questions[session_id].append(current_question_id)
+    # Mark question as answered in the database
+    if current_question_id not in answered:
+        answered.append(current_question_id)
+        supabase.table("user_sessions").update(
+            {"answered_questions": answered}
+        ).eq("session_id", session_id).execute()
     
     return JSONResponse(content={
         "message": "Updated results",
-        "progress": f"{len(answered_questions[session_id])}/{len(question_order)}"
+        "progress": f"{len(answered)}/{len(question_order)}"
     }, status_code=200)
 
 @app.get("/results", response_class=HTMLResponse)
