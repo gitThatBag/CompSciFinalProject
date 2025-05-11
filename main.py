@@ -21,6 +21,9 @@ supabase: Client = create_client(url, key)
 # Temporary in-memory session storage (you may use a database for persistent storage)
 user_sessions = {}
 
+class ChoiceModel(BaseModel):
+    choice: str
+
 @app.middleware("http")
 async def add_session(request: Request, call_next):
     session_id = request.cookies.get("session_id")
