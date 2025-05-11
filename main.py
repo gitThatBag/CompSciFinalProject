@@ -29,6 +29,7 @@ async def add_session(request: Request, call_next):
     session_id = request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid4())  # Generate a new session if not found
+        request.state.session_id = session_id
         response = await call_next(request)
         response.set_cookie("session_id", session_id)
         return response
