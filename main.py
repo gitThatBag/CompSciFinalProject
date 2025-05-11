@@ -131,11 +131,11 @@ async def get_results():
         <div class="question">
             <h2>{a} <span style="color:#666;">vs</span> {b}</h2>
             <div class="bar">
-                <div class="a-bar" style="width: {a_percent}%;">{a_percent}%</div>
+                <div class="a-bar" style="width: {a_percent}%;"></div>
             </div>
             <p>{a}: {a_count} votes</p>
             <div class="bar">
-                <div class="b-bar" style="width: {b_percent}%;">{b_percent}%</div>
+                <div class="b-bar" style="width: {b_percent}%;"></div>
             </div>
             <p>{b}: {b_count} votes</p>
             <p><strong>Total votes:</strong> {total}</p>
