@@ -184,11 +184,13 @@
           currentIndex = data.index;
 
           if (!data.a && !data.b) {
+            // Show end screen with results link
             container.innerHTML = `
-              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
-                🎉 Thanks for playing!<br><br>
-                <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%;font-size:2rem;color:#333;text-align:center;padding:2rem;">
+                <h1 style="font-size:3rem;margin-bottom:2rem;">🎉 Thanks for playing!</h1>
+                <a href="/results" style="display:inline-block;margin-top:2rem;padding:1rem 2rem;font-size:1.5rem;color:white;background-color:#3498db;text-decoration:none;border-radius:5px;box-shadow:0 4px 8px rgba(0,0,0,0.1);">View Results</a>
               </div>`;
+            container.classList.remove("fade-out");
             return;
           }
 
