@@ -181,7 +181,7 @@
         .then(res => res.json())
         .then(data => {
           const container = document.getElementById('question-container');
-          if (index >= questions.length) {
+          if (!data.a && !data.b) {
             container.innerHTML = `
               <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
                 🎉 Thanks for playing!<br><br>
@@ -197,7 +197,7 @@
           `;
 
           container.classList.remove("fade-out");
-          
+
         });
     }
   </script>
