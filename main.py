@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client, Client
 from pydantic import BaseModel
+from uuid import uuid4
 
 
 app = FastAPI()
@@ -17,44 +18,69 @@ supabase: Client = create_client(url, key)
 # Serve static files if needed
 #app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Temporary in-memory session storage (you may use a database for persistent storage)
+user_sessions = {}
+
+@app.middleware("http")
+async def add_session(request: Request, call_next):
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        session_id = str(uuid4())  # Generate a new session if not found
+        response = await call_next(request)
+        response.set_cookie("session_id", session_id)
+        return response
+    request.state.session_id = session_id
+    return await call_next(request)
+
 @app.get("/", response_class=HTMLResponse)
-async def get_game():
+async def get_game(request: Request):
+    # Get the user's session ID
+    session_id = request.state.session_id
+
+    # Retrieve the current question index from the session (default to 0 if not found)
+    current_index = user_sessions.get(session_id, 0)
+
+    # Fetch the question list from Supabase
     response = supabase.table("questions").select("*").execute()
     questions = response.data
 
-    if not questions:
-        return HTMLResponse(content="No questions found.", status_code=404)
+    if current_index >= len(questions):
+        return HTMLResponse(content="No more questions.", status_code=404)
 
-    first = questions[0]
+    # Get the current question
+    current_question = questions[current_index]
+
+    # Render the HTML with the question
     with open("templates/main.html", "r") as file:
         template = file.read()
 
-    question_html = template.replace("{{option_a}}", first["option_a"])
-    question_html = question_html.replace("{{option_b}}", first["option_b"])
+    question_html = template.replace("{{option_a}}", current_question["option_a"])
+    question_html = question_html.replace("{{option_b}}", current_question["option_b"])
 
     return HTMLResponse(content=question_html)
 
 @app.get("/next", response_class=JSONResponse)
-async def get_next_question(index: int = 1):
+async def get_next_question(request: Request):
+    session_id = request.state.session_id
+    current_index = user_sessions.get(session_id, 0)
+
+    # Fetch all questions
     response = supabase.table("questions").select("*").execute()
     questions = response.data
 
-    if index < len(questions):
-        q = questions[index]
-        return {"a": q["option_a"], "b": q["option_b"]}
-    return {"a": "", "b": ""}
-
-
-class ChoiceModel(BaseModel):
-    choice: str
+    if current_index < len(questions):
+        # Serve the current question
+        current_question = questions[current_index]
+        return {"a": current_question["option_a"], "b": current_question["option_b"]}
+    else:
+        return {"a": "", "b": ""}
 
 @app.post("/update-result")
-async def update_result(choice: ChoiceModel):
-    print("Received choice:", choice.choice)
-
+async def update_result(choice: ChoiceModel, request: Request):
+    session_id = request.state.session_id
     user_choice = choice.choice
 
-    # Get all questions
+    # Fetch all questions
     response = supabase.table("questions").select("*").execute()
     questions = response.data
 
@@ -64,17 +90,18 @@ async def update_result(choice: ChoiceModel):
             supabase.table("questions").update(
                 {"option_a_results": current_value + 1}
             ).eq("id", question["id"]).execute()
-            return JSONResponse(content={"message": "Updated option_a_results"}, status_code=200)
-
+            break
         elif user_choice == question["option_b"]:
             current_value = question.get("option_b_results", 0)
             supabase.table("questions").update(
                 {"option_b_results": current_value + 1}
             ).eq("id", question["id"]).execute()
-            return JSONResponse(content={"message": "Updated option_b_results"}, status_code=200)
+            break
 
-    return JSONResponse(content={"message": "Choice not found."}, status_code=404)
+    # Update session to move to the next question
+    user_sessions[session_id] = user_sessions.get(session_id, 0) + 1
 
+    return JSONResponse(content={"message": "Updated results"}, status_code=200)
 
 @app.get("/results", response_class=HTMLResponse)
 async def get_results():

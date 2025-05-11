@@ -175,12 +175,11 @@
     }
 
     function updateQuestion() {
-      currentQuestion++;
-
-      fetch(`/next?index=${currentQuestion}`)
+      fetch('/next')
         .then(res => res.json())
         .then(data => {
           const container = document.getElementById('question-container');
+
           if (!data.a && !data.b) {
             container.innerHTML = `
               <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
@@ -197,7 +196,6 @@
           `;
 
           container.classList.remove("fade-out");
-
         });
     }
   </script>
