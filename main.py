@@ -74,15 +74,14 @@ async def get_game(request: Request):
 
     return HTMLResponse(content=question_html)
 
-@app.post("/update-result")
-async def update_result(choice: ChoiceModel, request: Request):
+@app.get("/next", response_class=JSONResponse)
+async def get_next_question(request: Request):
     session_id = request.state.session_id
-    user_choice = choice.choice
     
     if session_id not in answered_questions:
         return JSONResponse(content={"error": "Invalid session"}, status_code=400)
 
-    # Find the current question (first unanswered one)
+    # Find the first unanswered question
     current_question_id = None
     for q_id in question_order:
         if q_id not in answered_questions[session_id]:
@@ -90,38 +89,21 @@ async def update_result(choice: ChoiceModel, request: Request):
             break
 
     if not current_question_id:
-        return JSONResponse(content={"error": "All questions completed"}, status_code=400)
+        return {"completed": True, "message": "All questions completed"}
 
-    # Fetch the question to validate choices
+    # Fetch the question
     response = supabase.table("questions").select("*").eq("id", current_question_id).execute()
     if not response.data:
         return JSONResponse(content={"error": "Question not found"}, status_code=404)
     
-    question = response.data[0]
+    current_question = response.data[0]
     
-    # Update the count
-    if user_choice == question["option_a"]:
-        current_value = question.get("option_a_results", 0)
-        supabase.table("questions").update(
-            {"option_a_results": current_value + 1}
-        ).eq("id", question["id"]).execute()
-    elif user_choice == question["option_b"]:
-        current_value = question.get("option_b_results", 0)
-        supabase.table("questions").update(
-            {"option_b_results": current_value + 1}
-        ).eq("id", question["id"]).execute()
-    else:
-        return JSONResponse(content={"error": "Invalid choice"}, status_code=400)
-    
-    # Mark question as answered - THIS IS THE CRITICAL FIX
-    if current_question_id not in answered_questions[session_id]:
-        answered_questions[session_id].append(current_question_id)
-    
-    return JSONResponse(content={
-        "message": "Updated results",
-        "progress": f"{len(answered_questions[session_id])}/{len(question_order)}"
-    }, status_code=200)
-    
+    return {
+        "a": current_question["option_a"],
+        "b": current_question["option_b"],
+        "question_id": current_question_id,
+        "progress": f"{len(answered_questions[session_id]) + 1}/{len(question_order)}"
+    }
 
 @app.post("/update-result")
 async def update_result(choice: ChoiceModel, request: Request):
