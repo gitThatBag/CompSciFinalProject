@@ -27,6 +27,8 @@
       background-color: #f0f0f0;
     }
 
+
+
     .container {
       min-height: 100dvh;
       display: flex;
@@ -136,53 +138,66 @@
 
 <body>
   <div class="container" id="question-container">
-    <div class="choice choice1" onclick="makeChoice(this, '{{option_a}}')">{{option_a}}</div>
+    <div class="choice choice1" onclick="makeChoice(this, '%%option_a%%')">%%option_a%%</div>
     <div class="or-divider">OR</div>
-    <div class="choice choice2" onclick="makeChoice(this, '{{option_b}}')">{{option_b}}</div>
+    <div class="choice choice2" onclick="makeChoice(this, '%%option_b%%')">%%option_b%%</div>    
   </div>
 
   <script>
-    // Store the current question ID - this will be injected by the server
-    const currentQuestionId = {question_id};
-
-    function makeChoice(element, choice) {
+        let currentQuestion = {{ question_id | tojson }};
+        // inject from backend
+  
+    function makeChoice(element, choice, questionId) {
       const container = document.getElementById('question-container');
       const choices = container.querySelectorAll('.choice');
-
+  
       element.classList.add('clicked');
       choices.forEach(btn => btn.style.pointerEvents = 'none');
-
+  
       setTimeout(() => {
         container.classList.add('fade-out');
       }, 300);
-
+  
       setTimeout(() => {
-        // Send the choice to the backend
-        updateResult(choice);
+        // Send the choice and question_id to the backend
+        updateResult(choice, questionId);
       }, 1000);
     }
-
-    function updateResult(choice) {
+  
+    function updateResult(choice, questionId) {
       fetch(`/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          choice: choice,
-          question_id: currentQuestionId
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.completed) {
-          // No more questions, show results
-          window.location.href = '/results';
-        } else if (data.next_id) {
-          // Redirect to the next question
-          window.location.href = `/question/${data.next_id}`;
-        }
-      });
+        body: JSON.stringify({ choice: choice, question_id: questionId })
+      }).then(res => res.json())
+        .then(data => {
+          if (data.completed || !data.next_id) {
+            showCompletionScreen();
+          } else {
+            loadNextQuestion(data.next_id);
+          }
+        });
+    }
+  
+    function loadNextQuestion(nextId) {
+      fetch(`/question/${nextId}`)
+        .then(res => res.text())
+        .then(html => {
+          document.open();
+          document.write(html);
+          document.close();
+        });
+    }
+  
+    function showCompletionScreen() {
+      const container = document.getElementById('question-container');
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#333;">
+          🎉 Thanks for playing!<br><br>
+          <a href="/results" style="margin-top: 1rem; font-size: 1.5rem; color: #3498db; text-decoration: underline;">View Results</a>
+        </div>`;
     }
   </script>
 </body>

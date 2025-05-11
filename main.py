@@ -52,9 +52,9 @@ async def get_question_page(question_id: int):
         template = file.read()
 
     # Replace the placeholders
-    question_html = template.replace("{{option_a}}", current_question["option_a"])
-    question_html = question_html.replace("{{option_b}}", current_question["option_b"])
-    question_html = question_html.replace("{{question_id}}", str(current_question["id"]))
+    question_html = template.replace("%%option_a%%", current_question["option_a"])
+    question_html = question_html.replace("%%option_b%%", current_question["option_b"])
+    question_html = question_html.replace("%%question_id%%", str(current_question["id"]))
 
     return HTMLResponse(content=question_html)
 
